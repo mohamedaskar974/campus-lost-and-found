@@ -4,23 +4,12 @@
   "functions": {
     "server.js": {
       "includeFiles": "index.html"
-    },
-    "api/**/*.js": {
-      "includeFiles": "index.html"
     }
   },
   "rewrites": [
     {
-      "source": "/api/items/(.*)/claim",
-      "destination": "/server.js"
-    },
-    {
-      "source": "/api/items",
-      "destination": "/api/items.js"
-    },
-    {
-      "source": "/api/metrics",
-      "destination": "/api/metrics.js"
+      "source": "/api/(.*)",
+      "destination": "/server.js?__api=$1"
     },
     {
       "source": "/(.*)",

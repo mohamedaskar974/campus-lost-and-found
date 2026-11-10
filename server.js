@@ -112,12 +112,8 @@ const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.POSTGRES_UR
 if (PG_CONNECTION_STRING) {
   try {
     const { Pool } = require('pg');
-    let connStr = PG_CONNECTION_STRING;
-    if (connStr.includes('sslmode=require')) {
-      connStr = connStr.replace('sslmode=require', 'sslmode=verify-full');
-    }
     pgPool = new Pool({
-      connectionString: connStr,
+      connectionString: PG_CONNECTION_STRING,
       ssl: { rejectUnauthorized: false }
     });
     console.log('🌐 Cloud PostgreSQL pool configured.');
@@ -335,24 +331,17 @@ function serveStaticFile(req, res, targetName, contentType) {
 async function handleRequest(req, res) {
   try {
     let rawUrl = req.url || '/';
-    const queryPart = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : '';
-    if (rawUrl.startsWith('/server.js') || rawUrl === '/') {
-      const headerPath = req.headers['x-matched-path'] || req.headers['x-forwarded-uri'] || req.headers['x-original-url'];
-      if (headerPath && !headerPath.startsWith('/server.js')) {
-        rawUrl = headerPath + (headerPath.includes('?') ? '' : queryPart);
-      }
-    }
     const parsedUrl = new URL(rawUrl, `http://${req.headers.host || 'localhost'}`);
-    let pathname = parsedUrl.pathname.replace(/\.js$/, '').replace(/\/$/, '') || '/';
+    let pathname = parsedUrl.pathname.replace(/\/$/, '') || '/';
     const method = req.method;
 
-    console.log('[DEBUG ROUTER]', JSON.stringify({
-      reqUrl: req.url,
-      method: req.method,
-      headers: req.headers,
-      rawUrl,
-      pathname
-    }));
+    // Handle Vercel rewrites: if rewritten to /server.js?__api=..., extract the intended API route
+    if (parsedUrl.searchParams.has('__api')) {
+      const apiVal = parsedUrl.searchParams.get('__api');
+      pathname = '/api/' + apiVal.split('?')[0];
+    } else if (pathname === '/server.js') {
+      pathname = '/';
+    }
 
     if (method === 'OPTIONS') {
       setCorsHeaders(res);
@@ -364,6 +353,17 @@ async function handleRequest(req, res) {
     // Ensure Cloud Postgres schema is initialized if connected
     if (pgPool && !pgInitialized) {
       await ensurePgSchema();
+    }
+
+    // 0. GET /api/health or /health
+    if (method === 'GET' && (pathname === '/api/health' || pathname === '/health' || pathname.endsWith('/api/health'))) {
+      return sendJSON(res, 200, {
+        status: 'online',
+        database: pgPool ? 'cloud_postgres_neon' : (useSQLite ? 'sqlite' : 'in_memory'),
+        cloudPostgresConnected: Boolean(pgPool),
+        developer: 'M. MOHAMED ASKAR (Reg No: 240071601159)',
+        supervisor: 'Dr. K. Palanivel'
+      });
     }
 
     // 1. GET /api/items or /items
@@ -622,6 +622,10 @@ async function handleRequest(req, res) {
 
   } catch (globalErr) {
     try {
+      console.error('Global server error:', globalErr);
+      if (req.url && (req.url.includes('/api/') || req.url.includes('__api'))) {
+        return sendJSON(res, 500, { success: false, error: 'Internal Server Error', message: globalErr.message });
+      }
       const html = getIndexHtml();
       setCorsHeaders(res);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

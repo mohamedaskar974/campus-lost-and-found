@@ -1757,7 +1757,8 @@
             campusItems = incomingItems;
             
             isBackendConnected = true;
-            if (statusText) statusText.innerHTML = `Live Auto-Sync Active &bull; Connected to SQLite DB`;
+            const dbLabel = data.source === 'cloud_postgres' ? 'Cloud PostgreSQL DB' : (data.source === 'sqlite' ? 'SQLite DB' : 'Backend DB');
+            if (statusText) statusText.innerHTML = `Live Auto-Sync Active &bull; Connected to ${dbLabel}`;
             if (pulseDot) pulseDot.style.background = "#10b981";
 
             renderItems();
