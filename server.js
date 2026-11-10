@@ -349,7 +349,7 @@ async function handleRequest(req, res) {
     console.log('[DEBUG ROUTER]', JSON.stringify({
       reqUrl: req.url,
       method: req.method,
-      matchedPath: req.headers['x-matched-path'],
+      headers: req.headers,
       rawUrl,
       pathname
     }));
