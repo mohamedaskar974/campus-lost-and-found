@@ -2,7 +2,7 @@
 /**
  * Crescent ReClaim - PHP REST API Endpoint
  * Handles: GET items, POST item, POST claim, GET metrics
- * Developer: M. MOHAED ASKAR (Reg No: 240071601159)
+ * Developer: M. MOHAMED ASKAR (Reg No: 240071601159)
  * Crescent Institute of Science & Technology
  */
 

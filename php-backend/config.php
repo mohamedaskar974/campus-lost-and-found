@@ -1,7 +1,7 @@
 <?php
 /**
  * Crescent ReClaim - PHP Database Configuration
- * Submitted by: M. MOHAED ASKAR (Reg No: 240071601159)
+ * Submitted by: M. MOHAMED ASKAR (Reg No: 240071601159)
  */
 
 $host = 'localhost';

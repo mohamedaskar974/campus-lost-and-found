@@ -1,6 +1,6 @@
 # Crescent ReClaim — Campus Lost & Found Portal
 
-**Author:** M. MOHAED ASKAR  
+**Author:** M. MOHAMED ASKAR  
 **Reg No:** 240071601159  
 **Degree:** II B.Sc. Computer Science  
 **Institution:** B.S. Abdur Rahman Crescent Institute of Science & Technology  

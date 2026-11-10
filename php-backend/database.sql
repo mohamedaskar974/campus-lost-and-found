@@ -1,7 +1,7 @@
 -- ============================================================================
 -- CRESCENT RECLAIM - CAMPUS LOST & FOUND PORTAL
 -- MySQL Relational Database Schema
--- Submitted by: M. MOHAED ASKAR (Reg No: 240071601159)
+-- Submitted by: M. MOHAMED ASKAR (Reg No: 240071601159)
 -- B.S. Abdur Rahman Crescent Institute of Science & Technology
 -- ============================================================================
 
@@ -56,5 +56,5 @@ CREATE TABLE IF NOT EXISTS email_logs (
 INSERT INTO items (id, type, status, category, title, `desc`, zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg) VALUES
 ('item-101', 'found', 'active', 'Electronics', 'Casio fx-991EX Classwiz Calculator', 'Found on study table in silent reading zone. Has blue anime sticker on the back cover.', 'Central Library', '2nd Floor Silent Hall, Table 14', 'https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?q=80&w=600&auto=format&fit=crop', 'Dr. K. Palanivel / Librarian Desk', 'library.desk@crescent.education', '+91 98401 22334', 'FAC-LIB-04'),
 ('item-102', 'found', 'active', 'Cards', 'Crescent Student ID Card (II B.Sc CS)', 'Blue lanyard with Crescent crest. Kept safely at the Canteen billing counter.', 'Main Canteen', 'Juice Counter Corner Table', 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=600&auto=format&fit=crop', 'Canteen Supervisor', 'canteen@crescent.education', '+91 98402 99881', 'STAFF-CAN-02'),
-('item-103', 'lost', 'active', 'Keys', 'Yamaha Bike Keys with Crescent Lanyard', 'Set of 2 keys with a black rubber key-head and a Crescent Club lanyard.', 'Campus Parking', 'Two-Wheeler Gate 2 Shed', 'https://images.unsplash.com/photo-1582139329536-e7284fece509?q=80&w=600&auto=format&fit=crop', 'M. Mohaed Askar', 'askar@crescent.education', '+91 98401 23456', '240071601159'),
+('item-103', 'lost', 'active', 'Keys', 'Yamaha Bike Keys with Crescent Lanyard', 'Set of 2 keys with a black rubber key-head and a Crescent Club lanyard.', 'Campus Parking', 'Two-Wheeler Gate 2 Shed', 'https://images.unsplash.com/photo-1582139329536-e7284fece509?q=80&w=600&auto=format&fit=crop', 'M. MOHAMED Askar', 'askar@crescent.education', '+91 98401 23456', '240071601159'),
 ('item-104', 'found', 'active', 'Bottles', 'Milton Thermosteel Black Water Bottle (750ml)', 'Matte black insulated bottle with a small dent at bottom rim.', 'Sports Complex', 'Badminton Court 1 Bench', 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?q=80&w=600&auto=format&fit=crop', 'Sports In-Charge', 'sports@crescent.education', '+91 98403 44556', 'STAFF-SPT-01');

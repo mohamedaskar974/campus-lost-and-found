@@ -2,7 +2,7 @@
 title Crescent ReClaim - Backend Server
 echo ===================================================
 echo Crescent ReClaim - Campus Lost and Found Server
-echo Developer: M. MOHAED ASKAR (Reg No: 240071601159)
+echo Developer: M. MOHAMED ASKAR (Reg No: 240071601159)
 echo Crescent Institute of Science and Technology
 echo ===================================================
 echo.

@@ -2,7 +2,7 @@
  * ============================================================================
  * CRESCENT RECLAIM - CAMPUS LOST & FOUND PORTAL BACKEND SERVER
  * ============================================================================
- * Developer: M. MOHAED ASKAR (Reg No: 240071601159)
+ * Developer: M. MOHAMED ASKAR (Reg No: 240071601159)
  * Department: Computer Science & Engineering
  * Institution: B.S. Abdur Rahman Crescent Institute of Science & Technology
  * Guided by: Dr. K. Palanivel, M.Sc., M.Phil., Ph.D.
@@ -79,7 +79,7 @@ let fallbackItems = [
     zone: 'Campus Parking',
     exact_spot: 'Two-Wheeler Gate 2 Shed',
     photo_url: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?q=80&w=600&auto=format&fit=crop',
-    reporter_name: 'M. Mohaed Askar',
+    reporter_name: 'M. MOHAMED Askar',
     reporter_email: 'askar@crescent.education',
     reporter_phone: '+91 98401 23456',
     reporter_reg: '240071601159',
@@ -460,7 +460,7 @@ if (require.main === module) {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`========================================================`);
     console.log(`Crescent ReClaim Server listening on http://localhost:${PORT}`);
-    console.log(`Developer: M. MOHAED ASKAR (Reg No: 240071601159)`);
+    console.log(`Developer: M. MOHAMED ASKAR (Reg No: 240071601159)`);
     console.log(`========================================================`);
   });
 }

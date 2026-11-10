@@ -1,5 +1,5 @@
 # Complete Deployment Guide — Crescent ReClaim
-**Portal Creator:** M. MOHAED ASKAR (Reg No: 240071601159)  
+**Portal Creator:** M. MOHAMED ASKAR (Reg No: 240071601159)  
 **Institution:** B.S. Abdur Rahman Crescent Institute of Science & Technology  
 
 ---
@@ -88,7 +88,7 @@ If you want an independent cloud database hosted separately:
 
 ## ✅ Post-Deployment Verification Checklist
 1. Visit your live deployment URL on your mobile phone and laptop.
-2. Verify that creator branding: `M. MOHAED ASKAR | Reg: 240071601159` is visible at the top-left corner.
+2. Verify that creator branding: `M. MOHAMED ASKAR | Reg: 240071601159` is visible at the top-left corner.
 3. Click **"+ Report an Item"**, upload a photo from your phone, and submit.
 4. Refresh the page on another device or computer: the new item and photo will appear immediately from the database!
 5. Click **"Claim This Item"**, enter proof, and verify that the claim alert is generated.
