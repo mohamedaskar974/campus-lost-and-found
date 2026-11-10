@@ -19,7 +19,7 @@ const IS_VERCEL = !!(process.env.VERCEL || process.env.NOW_REGION);
 
 // In serverless / Vercel, only /tmp is writable
 const UPLOADS_DIR = IS_VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
-const DB_PATH = process.env.DATABASE_PATH || (IS_VERCEL ? path.join('/tmp', 'crescent_reclaim.db') : path.join(__dirname, 'crescent_reclaim.db'));
+const SQLITE_DB_PATH = process.env.DATABASE_PATH || (IS_VERCEL ? path.join('/tmp', 'crescent_reclaim.db') : path.join(__dirname, 'crescent_reclaim.db'));
 
 try {
   if (!fs.existsSync(UPLOADS_DIR)) {
@@ -30,12 +30,8 @@ try {
 }
 
 /* ============================================================================
-   1. DATABASE ENGINE (SQLite with Resilient In-Memory Fallback)
+   1. SEED DATASET (Verified Campus Items)
    ============================================================================ */
-let db = null;
-let useSQLite = false;
-
-// Default Seed Data
 let fallbackItems = [
   {
     id: 'item-101',
@@ -105,13 +101,101 @@ let fallbackItems = [
 
 let fallbackClaims = [];
 
-// Safely initialize SQLite if supported by runtime
+/* ============================================================================
+   2. CLOUD DATABASE ENGINE (PostgreSQL: Neon / Supabase / Vercel Postgres)
+   ============================================================================ */
+let pgPool = null;
+let pgInitialized = false;
+
+const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL;
+
+if (PG_CONNECTION_STRING) {
+  try {
+    const { Pool } = require('pg');
+    pgPool = new Pool({
+      connectionString: PG_CONNECTION_STRING,
+      ssl: { rejectUnauthorized: false }
+    });
+    console.log('🌐 Cloud PostgreSQL pool configured.');
+  } catch (err) {
+    console.error('⚠️ Failed to load pg driver:', err.message);
+  }
+}
+
+// Auto-initialize PostgreSQL tables and seed data if needed
+async function ensurePgSchema() {
+  if (!pgPool || pgInitialized) return;
+  try {
+    const client = await pgPool.connect();
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS items (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          category TEXT NOT NULL,
+          title TEXT NOT NULL,
+          "desc" TEXT NOT NULL,
+          zone TEXT NOT NULL,
+          exact_spot TEXT NOT NULL,
+          photo_url TEXT NOT NULL,
+          reporter_name TEXT NOT NULL,
+          reporter_email TEXT NOT NULL,
+          reporter_phone TEXT,
+          reporter_reg TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS claims (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL,
+          claimant_name TEXT NOT NULL,
+          claimant_reg TEXT NOT NULL,
+          claimant_email TEXT NOT NULL,
+          claimant_phone TEXT NOT NULL,
+          proof_details TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      const countRes = await client.query('SELECT COUNT(*) as c FROM items');
+      if (parseInt(countRes.rows[0].c, 10) === 0) {
+        console.log('🌱 Seeding initial campus items into Cloud PostgreSQL...');
+        for (const item of fallbackItems) {
+          await client.query(`
+            INSERT INTO items (id, type, status, category, title, "desc", zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT (id) DO NOTHING
+          `, [
+            item.id, item.type, item.status, item.category, item.title, item.desc,
+            item.zone, item.exact_spot, item.photo_url, item.reporter_name,
+            item.reporter_email, item.reporter_phone, item.reporter_reg
+          ]);
+        }
+      }
+      pgInitialized = true;
+      console.log('✅ Cloud PostgreSQL tables and data verified.');
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('⚠️ PostgreSQL schema setup notice:', err.message);
+  }
+}
+
+/* ============================================================================
+   3. LOCAL DATABASE ENGINE (SQLite Fallback)
+   ============================================================================ */
+let sqliteDb = null;
+let useSQLite = false;
+
 try {
   const { DatabaseSync } = require('node:sqlite');
-  db = new DatabaseSync(DB_PATH);
+  sqliteDb = new DatabaseSync(SQLITE_DB_PATH);
   useSQLite = true;
 
-  db.exec(`
+  sqliteDb.exec(`
     CREATE TABLE IF NOT EXISTS items (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -143,9 +227,9 @@ try {
     );
   `);
 
-  const count = db.prepare('SELECT COUNT(*) as count FROM items').get().count;
+  const count = sqliteDb.prepare('SELECT COUNT(*) as count FROM items').get().count;
   if (count === 0) {
-    const insertStmt = db.prepare(`
+    const insertStmt = sqliteDb.prepare(`
       INSERT INTO items (id, type, status, category, title, desc, zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
@@ -158,13 +242,12 @@ try {
     }
   }
 } catch (e) {
-  // If node:sqlite is absent or fails, fallback to persistent in-memory store
   useSQLite = false;
-  db = null;
+  sqliteDb = null;
 }
 
 /* ============================================================================
-   2. HTTP HELPERS & UTILITIES
+   4. HTTP HELPERS & UTILITIES
    ============================================================================ */
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -223,7 +306,6 @@ function serveStaticFile(req, res, targetName, contentType) {
     }
 
     if (!foundPath) {
-      // Fallback to index.html for single-page app behavior
       const html = getIndexHtml();
       setCorsHeaders(res);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -244,7 +326,7 @@ function serveStaticFile(req, res, targetName, contentType) {
 }
 
 /* ============================================================================
-   3. MAIN REQUEST HANDLER (Serverless & Standalone Compatible)
+   5. MAIN REQUEST HANDLER (Cloud Postgres + SQLite + In-Memory Fallback)
    ============================================================================ */
 async function handleRequest(req, res) {
   try {
@@ -259,6 +341,11 @@ async function handleRequest(req, res) {
       return;
     }
 
+    // Ensure Cloud Postgres schema is initialized if connected
+    if (pgPool && !pgInitialized) {
+      await ensurePgSchema();
+    }
+
     // 1. GET /api/items or /items
     if (method === 'GET' && (pathname === '/api/items' || pathname === '/items')) {
       const type = parsedUrl.searchParams.get('type') || 'all';
@@ -266,7 +353,39 @@ async function handleRequest(req, res) {
       const zone = parsedUrl.searchParams.get('zone') || 'all';
       const search = (parsedUrl.searchParams.get('search') || '').trim();
 
-      if (useSQLite && db) {
+      // Priority 1: Cloud PostgreSQL
+      if (pgPool) {
+        try {
+          let query = 'SELECT id, type, status, category, title, "desc", zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg, created_at FROM items WHERE 1=1';
+          const params = [];
+          if (type !== 'all') {
+            params.push(type);
+            query += ` AND type = $${params.length}`;
+          }
+          if (category !== 'all') {
+            params.push(category);
+            query += ` AND category = $${params.length}`;
+          }
+          if (zone !== 'all') {
+            params.push(zone);
+            query += ` AND zone = $${params.length}`;
+          }
+          if (search) {
+            const wild = `%${search.toLowerCase()}%`;
+            params.push(wild);
+            const pIndex = params.length;
+            query += ` AND (LOWER(title) LIKE $${pIndex} OR LOWER("desc") LIKE $${pIndex} OR LOWER(zone) LIKE $${pIndex})`;
+          }
+          query += ' ORDER BY created_at DESC';
+          const pgRes = await pgPool.query(query, params);
+          return sendJSON(res, 200, { success: true, count: pgRes.rows.length, items: pgRes.rows, source: 'cloud_postgres' });
+        } catch (err) {
+          console.error('PG query fallback:', err.message);
+        }
+      }
+
+      // Priority 2: Local SQLite
+      if (useSQLite && sqliteDb) {
         try {
           let query = 'SELECT * FROM items WHERE 1=1';
           const params = [];
@@ -279,11 +398,12 @@ async function handleRequest(req, res) {
             params.push(wild, wild, wild);
           }
           query += ' ORDER BY created_at DESC';
-          const items = db.prepare(query).all(...params);
-          return sendJSON(res, 200, { success: true, count: items.length, items });
+          const items = sqliteDb.prepare(query).all(...params);
+          return sendJSON(res, 200, { success: true, count: items.length, items, source: 'sqlite' });
         } catch (err) {}
       }
 
+      // Priority 3: In-Memory
       let filtered = fallbackItems.filter(item => {
         const matchType = (type === 'all' || item.type === type);
         const matchCat = (category === 'all' || item.category === category);
@@ -295,7 +415,7 @@ async function handleRequest(req, res) {
         return matchType && matchCat && matchZone && matchSearch;
       });
 
-      return sendJSON(res, 200, { success: true, count: filtered.length, items: filtered });
+      return sendJSON(res, 200, { success: true, count: filtered.length, items: filtered, source: 'memory' });
     }
 
     // 2. POST /api/items or /items
@@ -327,9 +447,26 @@ async function handleRequest(req, res) {
         created_at: new Date().toISOString()
       };
 
-      if (useSQLite && db) {
+      // Save to Cloud Postgres
+      if (pgPool) {
         try {
-          db.prepare(`
+          await pgPool.query(`
+            INSERT INTO items (id, type, status, category, title, "desc", zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg, created_at)
+            VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+          `, [
+            id, newItem.type, category, title, newItem.desc, zone, newItem.exact_spot,
+            savedPhoto, reporter_name, reporter_email, reporter_phone || '', reporter_reg || ''
+          ]);
+          console.log(`☁️ [CLOUD POSTGRES] Saved new report: "${title}" by ${reporter_name}`);
+        } catch (err) {
+          console.error('PG insert error:', err.message);
+        }
+      }
+
+      // Save to SQLite
+      if (useSQLite && sqliteDb) {
+        try {
+          sqliteDb.prepare(`
             INSERT INTO items (id, type, status, category, title, desc, zone, exact_spot, photo_url, reporter_name, reporter_email, reporter_phone, reporter_reg)
             VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(id, newItem.type, category, title, newItem.desc, zone, newItem.exact_spot, savedPhoto, reporter_name, reporter_email, reporter_phone || '', reporter_reg || '');
@@ -348,8 +485,14 @@ async function handleRequest(req, res) {
       const { claimant_name, claimant_reg, claimant_email, claimant_phone, proof_details } = body || {};
 
       let item = fallbackItems.find(i => i.id === itemId);
-      if (!item && useSQLite && db) {
-        try { item = db.prepare('SELECT * FROM items WHERE id = ?').get(itemId); } catch (e) {}
+
+      if (pgPool) {
+        try {
+          const pgItemRes = await pgPool.query('SELECT * FROM items WHERE id = $1', [itemId]);
+          if (pgItemRes.rows.length > 0) item = pgItemRes.rows[0];
+        } catch (err) {}
+      } else if (!item && useSQLite && sqliteDb) {
+        try { item = sqliteDb.prepare('SELECT * FROM items WHERE id = ?').get(itemId); } catch (e) {}
       }
 
       if (!item) {
@@ -357,13 +500,28 @@ async function handleRequest(req, res) {
       }
 
       const claimId = 'claim-' + Date.now();
-      if (useSQLite && db) {
+
+      // Cloud Postgres
+      if (pgPool) {
         try {
-          db.prepare(`
+          await pgPool.query(`
+            INSERT INTO claims (id, item_id, claimant_name, claimant_reg, claimant_email, claimant_phone, proof_details, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          `, [claimId, itemId, claimant_name, claimant_reg || '', claimant_email, claimant_phone || '', proof_details]);
+          await pgPool.query(`UPDATE items SET status = 'claim_pending' WHERE id = $1`, [itemId]);
+        } catch (err) {
+          console.error('PG claim error:', err.message);
+        }
+      }
+
+      // SQLite
+      if (useSQLite && sqliteDb) {
+        try {
+          sqliteDb.prepare(`
             INSERT INTO claims (id, item_id, claimant_name, claimant_reg, claimant_email, claimant_phone, proof_details)
             VALUES (?, ?, ?, ?, ?, ?, ?)
           `).run(claimId, itemId, claimant_name, claimant_reg || '', claimant_email, claimant_phone || '', proof_details);
-          db.prepare(`UPDATE items SET status = 'claim_pending' WHERE id = ?`).run(itemId);
+          sqliteDb.prepare(`UPDATE items SET status = 'claim_pending' WHERE id = ?`).run(itemId);
         } catch (err) {}
       }
 
@@ -372,7 +530,7 @@ async function handleRequest(req, res) {
 
       return sendJSON(res, 200, {
         success: true,
-        message: 'Claim recorded in database. Email alert dispatched to finder.',
+        message: 'Claim recorded in cloud database. Email alert dispatched to finder.',
         claimId,
         emailAlert: {
           to: item.reporter_email,
@@ -392,12 +550,23 @@ async function handleRequest(req, res) {
       let lostItems = fallbackItems.filter(i => i.type === 'lost').length;
       let totalClaims = fallbackClaims.length;
 
-      if (useSQLite && db) {
+      if (pgPool) {
         try {
-          totalReports = db.prepare('SELECT COUNT(*) as count FROM items').get().count;
-          foundItems = db.prepare("SELECT COUNT(*) as count FROM items WHERE type = 'found'").get().count;
-          lostItems = db.prepare("SELECT COUNT(*) as count FROM items WHERE type = 'lost'").get().count;
-          totalClaims = db.prepare('SELECT COUNT(*) as count FROM claims').get().count;
+          const totRes = await pgPool.query('SELECT COUNT(*) as c FROM items');
+          const fndRes = await pgPool.query("SELECT COUNT(*) as c FROM items WHERE type = 'found'");
+          const lstRes = await pgPool.query("SELECT COUNT(*) as c FROM items WHERE type = 'lost'");
+          const clmRes = await pgPool.query('SELECT COUNT(*) as c FROM claims');
+          totalReports = parseInt(totRes.rows[0].c, 10);
+          foundItems = parseInt(fndRes.rows[0].c, 10);
+          lostItems = parseInt(lstRes.rows[0].c, 10);
+          totalClaims = parseInt(clmRes.rows[0].c, 10);
+        } catch (err) {}
+      } else if (useSQLite && sqliteDb) {
+        try {
+          totalReports = sqliteDb.prepare('SELECT COUNT(*) as count FROM items').get().count;
+          foundItems = sqliteDb.prepare("SELECT COUNT(*) as count FROM items WHERE type = 'found'").get().count;
+          lostItems = sqliteDb.prepare("SELECT COUNT(*) as count FROM items WHERE type = 'lost'").get().count;
+          totalClaims = sqliteDb.prepare('SELECT COUNT(*) as count FROM claims').get().count;
         } catch (err) {}
       }
 
@@ -432,7 +601,6 @@ async function handleRequest(req, res) {
     return serveStaticFile(req, res, 'index.html', 'text/html; charset=utf-8');
 
   } catch (globalErr) {
-    // Ultimate safety: always return the HTML page even if an unexpected error occurs
     try {
       const html = getIndexHtml();
       setCorsHeaders(res);
@@ -447,20 +615,18 @@ async function handleRequest(req, res) {
 }
 
 /* ============================================================================
-   4. EXPORTS & SERVER STARTUP
+   6. EXPORTS & SERVER STARTUP
    ============================================================================ */
-// CRITICAL FOR VERCEL SERVERLESS:
-// Must export request listener function so Vercel can invoke it without app.listen()
 module.exports = handleRequest;
 module.exports.default = handleRequest;
 
-// Only listen locally or when run directly with `node server.js`
 if (require.main === module) {
   const server = http.createServer(handleRequest);
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`========================================================`);
     console.log(`Crescent ReClaim Server listening on http://localhost:${PORT}`);
     console.log(`Developer: M. MOHAMED ASKAR (Reg No: 240071601159)`);
+    console.log(`Database: ${PG_CONNECTION_STRING ? 'Cloud PostgreSQL' : (useSQLite ? 'Local SQLite' : 'In-Memory')}`);
     console.log(`========================================================`);
   });
 }

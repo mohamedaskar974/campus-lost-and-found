@@ -20,5 +20,8 @@
     "deployment"
   ],
   "author": "M. MOHAMED ASKAR",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
 }
