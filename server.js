@@ -330,7 +330,8 @@ function serveStaticFile(req, res, targetName, contentType) {
    ============================================================================ */
 async function handleRequest(req, res) {
   try {
-    const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const rawUrl = req.headers['x-forwarded-uri'] || req.headers['x-matched-path'] || req.url || '/';
+    const parsedUrl = new URL(rawUrl, `http://${req.headers.host || 'localhost'}`);
     let pathname = parsedUrl.pathname;
     const method = req.method;
 
