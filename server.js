@@ -12,6 +12,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const getIndexHtml = require('./htmlTemplate.js');
 
 const PORT = process.env.PORT || 5000;
 const IS_VERCEL = !!(process.env.VERCEL || process.env.NOW_REGION);
@@ -199,6 +200,14 @@ function parseJSONBody(req) {
 
 function serveStaticFile(req, res, targetName, contentType) {
   try {
+    if (targetName === 'index.html' || targetName.endsWith('.html')) {
+      const html = getIndexHtml();
+      setCorsHeaders(res);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
+
     const candidates = [
       path.join(__dirname, targetName),
       path.join(process.cwd(), targetName),
@@ -214,8 +223,11 @@ function serveStaticFile(req, res, targetName, contentType) {
     }
 
     if (!foundPath) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('404 Not Found: ' + targetName);
+      // Fallback to index.html for single-page app behavior
+      const html = getIndexHtml();
+      setCorsHeaders(res);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
       return;
     }
 
@@ -224,8 +236,10 @@ function serveStaticFile(req, res, targetName, contentType) {
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('Server error loading file: ' + err.message);
+    const html = getIndexHtml();
+    setCorsHeaders(res);
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
   }
 }
 
@@ -411,17 +425,24 @@ async function handleRequest(req, res) {
       if (fs.existsSync(filePath)) {
         return serveStaticFile(req, res, filePath, 'image/jpeg');
       }
-      // If not on disk, redirect to index.html or return placeholder
       return serveStaticFile(req, res, 'index.html', 'text/html; charset=utf-8');
     }
 
-    // Default: serve index.html for single-page application navigation
+    // Default: serve index.html
     return serveStaticFile(req, res, 'index.html', 'text/html; charset=utf-8');
 
   } catch (globalErr) {
-    setCorsHeaders(res);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal Server Error', message: globalErr.message }));
+    // Ultimate safety: always return the HTML page even if an unexpected error occurs
+    try {
+      const html = getIndexHtml();
+      setCorsHeaders(res);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e2) {
+      setCorsHeaders(res);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal Server Error', message: globalErr.message }));
+    }
   }
 }
 
