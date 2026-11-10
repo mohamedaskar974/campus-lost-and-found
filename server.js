@@ -346,6 +346,14 @@ async function handleRequest(req, res) {
     let pathname = parsedUrl.pathname.replace(/\.js$/, '').replace(/\/$/, '') || '/';
     const method = req.method;
 
+    console.log('[DEBUG ROUTER]', JSON.stringify({
+      reqUrl: req.url,
+      method: req.method,
+      matchedPath: req.headers['x-matched-path'],
+      rawUrl,
+      pathname
+    }));
+
     if (method === 'OPTIONS') {
       setCorsHeaders(res);
       res.writeHead(204);
