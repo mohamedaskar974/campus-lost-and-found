@@ -330,9 +330,12 @@ function serveStaticFile(req, res, targetName, contentType) {
    ============================================================================ */
 async function handleRequest(req, res) {
   try {
-    const rawUrl = req.headers['x-forwarded-uri'] || req.headers['x-matched-path'] || req.url || '/';
+    let rawUrl = req.url || '/';
+    if (rawUrl === '/server.js') {
+      rawUrl = req.headers['x-forwarded-uri'] || req.headers['x-original-url'] || '/';
+    }
     const parsedUrl = new URL(rawUrl, `http://${req.headers.host || 'localhost'}`);
-    let pathname = parsedUrl.pathname;
+    let pathname = parsedUrl.pathname.replace(/\/$/, '') || '/';
     const method = req.method;
 
     if (method === 'OPTIONS') {
@@ -348,7 +351,7 @@ async function handleRequest(req, res) {
     }
 
     // 1. GET /api/items or /items
-    if (method === 'GET' && (pathname === '/api/items' || pathname === '/items')) {
+    if (method === 'GET' && (pathname === '/api/items' || pathname === '/items' || pathname.endsWith('/api/items'))) {
       const type = parsedUrl.searchParams.get('type') || 'all';
       const category = parsedUrl.searchParams.get('category') || 'all';
       const zone = parsedUrl.searchParams.get('zone') || 'all';
@@ -420,7 +423,7 @@ async function handleRequest(req, res) {
     }
 
     // 2. POST /api/items or /items
-    if (method === 'POST' && (pathname === '/api/items' || pathname === '/items')) {
+    if (method === 'POST' && (pathname === '/api/items' || pathname === '/items' || pathname.endsWith('/api/items'))) {
       const body = await parseJSONBody(req);
       const { type, category, title, desc, zone, exact_spot, photo, reporter_name, reporter_email, reporter_phone, reporter_reg } = body || {};
 
@@ -479,7 +482,7 @@ async function handleRequest(req, res) {
     }
 
     // 3. POST /api/items/:id/claim
-    const claimMatch = pathname.match(/^\/(?:api\/)?items\/([^/]+)\/claim$/);
+    const claimMatch = pathname.match(/(?:^|\/)items\/([^/]+)\/claim$/);
     if (method === 'POST' && claimMatch) {
       const itemId = claimMatch[1];
       const body = await parseJSONBody(req);
@@ -545,7 +548,7 @@ async function handleRequest(req, res) {
     }
 
     // 4. GET /api/metrics or /metrics
-    if (method === 'GET' && (pathname === '/api/metrics' || pathname === '/metrics')) {
+    if (method === 'GET' && (pathname === '/api/metrics' || pathname === '/metrics' || pathname.endsWith('/api/metrics'))) {
       let totalReports = fallbackItems.length;
       let foundItems = fallbackItems.filter(i => i.type === 'found').length;
       let lostItems = fallbackItems.filter(i => i.type === 'lost').length;
