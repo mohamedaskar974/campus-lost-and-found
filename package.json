@@ -1,0 +1,23 @@
+{
+  "name": "crescent-reclaim-portal",
+  "version": "1.0.0",
+  "description": "Crescent ReClaim - Campus Lost & Found Web Portal by M. Mohaed Askar (Reg: 240071601159)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "campus-lost-and-found",
+    "crescent-institute",
+    "full-stack",
+    "sqlite",
+    "postgres",
+    "deployment"
+  ],
+  "author": "M. MOHAED ASKAR",
+  "license": "MIT"
+}
