@@ -112,8 +112,12 @@ const PG_CONNECTION_STRING = process.env.DATABASE_URL || process.env.POSTGRES_UR
 if (PG_CONNECTION_STRING) {
   try {
     const { Pool } = require('pg');
+    let connStr = PG_CONNECTION_STRING;
+    if (connStr.includes('sslmode=require')) {
+      connStr = connStr.replace('sslmode=require', 'sslmode=verify-full');
+    }
     pgPool = new Pool({
-      connectionString: PG_CONNECTION_STRING,
+      connectionString: connStr,
       ssl: { rejectUnauthorized: false }
     });
     console.log('🌐 Cloud PostgreSQL pool configured.');
@@ -331,11 +335,15 @@ function serveStaticFile(req, res, targetName, contentType) {
 async function handleRequest(req, res) {
   try {
     let rawUrl = req.url || '/';
-    if (rawUrl === '/server.js') {
-      rawUrl = req.headers['x-forwarded-uri'] || req.headers['x-original-url'] || '/';
+    const queryPart = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?')) : '';
+    if (rawUrl.startsWith('/server.js') || rawUrl === '/') {
+      const headerPath = req.headers['x-matched-path'] || req.headers['x-forwarded-uri'] || req.headers['x-original-url'];
+      if (headerPath && !headerPath.startsWith('/server.js')) {
+        rawUrl = headerPath + (headerPath.includes('?') ? '' : queryPart);
+      }
     }
     const parsedUrl = new URL(rawUrl, `http://${req.headers.host || 'localhost'}`);
-    let pathname = parsedUrl.pathname.replace(/\/$/, '') || '/';
+    let pathname = parsedUrl.pathname.replace(/\.js$/, '').replace(/\/$/, '') || '/';
     const method = req.method;
 
     if (method === 'OPTIONS') {
