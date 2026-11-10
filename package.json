@@ -4,11 +4,12 @@
   "description": "Crescent ReClaim - Campus Lost & Found Web Portal by M. Mohaed Askar (Reg: 240071601159)",
   "main": "server.js",
   "scripts": {
+    "build": "echo 'Build complete'",
     "start": "node server.js",
     "dev": "node server.js"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "22.x"
   },
   "keywords": [
     "campus-lost-and-found",
